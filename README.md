@@ -20,6 +20,7 @@ A real-time peer-to-peer video calling application built with React, Next.js, an
 ## Tech Stack
 
 ### Frontend
+
 - **Next.js 16** - React framework with App Router
 - **TypeScript** - Type-safe development
 - **Tailwind CSS** - Utility-first styling
@@ -27,10 +28,12 @@ A real-time peer-to-peer video calling application built with React, Next.js, an
 - **Lucide React** - Beautiful icons
 
 ### WebRTC & Real-time Communication
+
 - **WebRTC API** - Peer-to-peer video/audio streaming
 - **Socket.io Client** - Real-time signaling
 
 ### Backend (Signaling Server)
+
 - **Node.js** - JavaScript runtime
 - **Express** - Web server framework
 - **Socket.io** - WebSocket server for signaling
@@ -42,29 +45,29 @@ A real-time peer-to-peer video calling application built with React, Next.js, an
 
 ```
 ┌─────────────┐                    ┌──────────────────┐                    ┌─────────────┐
-│   Client A  │◄──────Socket.io────►│ Signaling Server │◄────Socket.io─────►│   Client B  │
+│   Client A  │◄──────Socket.io───►│ Signaling Server │◄────Socket.io─────►│   Client B  │
 │  (Initiator)│                    └──────────────────┘                    │   (Joiner)  │
 └─────────────┘                                                            └─────────────┘
-      │                                                                            │
+      │                                                                           │
       │ 1. Create Room                                                            │
       ├──────────────────────────────────────────────────────────────────────────►│
-      │                                                                            │
+      │                                                                           │
       │                          2. Join Room                                     │
       │◄──────────────────────────────────────────────────────────────────────────┤
-      │                                                                            │
+      │                                                                           │
       │ 3. Send Offer (SDP)                                                       │
       ├──────────────────────────────────────────────────────────────────────────►│
-      │                                                                            │
+      │                                                                           │
       │                          4. Send Answer (SDP)                             │
       │◄──────────────────────────────────────────────────────────────────────────┤
-      │                                                                            │
+      │                                                                           │
       │ 5. Exchange ICE Candidates                                                │
       │◄─────────────────────────────────────────────────────────────────────────►│
-      │                                                                            │
+      │                                                                           │
       │                    6. Establish P2P Connection                            │
-      ╞════════════════════════════════════════════════════════════════════════════╡
+      ╞═══════════════════════════════════════════════════════════════════════════╡
       │                    Direct Media Stream (Video/Audio)                      │
-      ╞════════════════════════════════════════════════════════════════════════════╡
+      ╞═══════════════════════════════════════════════════════════════════════════╡
 ```
 
 ### Key Components
@@ -99,22 +102,26 @@ A real-time peer-to-peer video calling application built with React, Next.js, an
 ### Installation Steps
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd webrtc-vc-claude
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Configure environment variables**
+
    ```bash
    cp .env.example .env.local
    ```
 
    Edit `.env.local` if needed:
+
    ```env
    NEXT_PUBLIC_SIGNALING_SERVER_URL=http://localhost:3001
    ```
@@ -122,11 +129,13 @@ A real-time peer-to-peer video calling application built with React, Next.js, an
 4. **Run the application**
 
    Start both client and server:
+
    ```bash
    npm run dev
    ```
 
    Or run them separately:
+
    ```bash
    # Terminal 1 - Client
    npm run dev:client
@@ -136,8 +145,8 @@ A real-time peer-to-peer video calling application built with React, Next.js, an
    ```
 
 5. **Open the application**
-   - Client: http://localhost:3000
-   - Server health check: http://localhost:3001/health
+   - Client: <http://localhost:3000>
+   - Server health check: <http://localhost:3001/health>
 
 ## Usage Guide
 
@@ -229,6 +238,7 @@ webrtc-vc-claude/
 ### STUN Servers
 
 The application uses Google's public STUN servers by default:
+
 - `stun:stun.l.google.com:19302`
 - `stun:stun1.l.google.com:19302`
 
@@ -278,11 +288,13 @@ const ICE_SERVERS = {
 ### Deploying the Client
 
 1. **Build the Next.js application**
+
    ```bash
    npm run build
    ```
 
 2. **Deploy to Vercel** (Recommended)
+
    ```bash
    vercel deploy
    ```
@@ -301,6 +313,7 @@ const ICE_SERVERS = {
    - DigitalOcean
 
 2. **Example: Deploy to Railway**
+
    ```bash
    # Install Railway CLI
    npm i -g @railway/cli
@@ -316,6 +329,7 @@ const ICE_SERVERS = {
    ```
 
 3. **Set environment variables**
+
    ```
    PORT=3001
    CLIENT_URL=https://your-frontend-url.vercel.app
@@ -362,6 +376,7 @@ const ICE_SERVERS = {
 ## Future Enhancements
 
 Potential features to add:
+
 - [ ] Screen sharing
 - [ ] Chat functionality
 - [ ] More than 2 participants (mesh or SFU architecture)
@@ -388,6 +403,7 @@ This project is licensed under the MIT License.
 ## Support
 
 For questions or issues:
+
 - Open an issue on GitHub
 - Check existing issues for solutions
 - Review the troubleshooting section
