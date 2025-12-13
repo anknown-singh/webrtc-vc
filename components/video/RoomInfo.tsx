@@ -1,26 +1,37 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Copy, Check } from 'lucide-react';
-import type { ConnectionStatus } from '@/types/webrtc';
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Copy, Check, Users } from "lucide-react";
+import type { ConnectionStatus } from "@/types/webrtc";
 
 interface RoomInfoProps {
   roomId: string;
   connectionStatus: ConnectionStatus;
+  participantCount?: number;
 }
 
-const statusConfig: Record<ConnectionStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  idle: { label: 'Idle', variant: 'secondary' },
-  connecting: { label: 'Connecting...', variant: 'outline' },
-  connected: { label: 'Connected', variant: 'default' },
-  disconnected: { label: 'Disconnected', variant: 'destructive' },
-  failed: { label: 'Failed', variant: 'destructive' },
+const statusConfig: Record<
+  ConnectionStatus,
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  }
+> = {
+  idle: { label: "Idle", variant: "secondary" },
+  connecting: { label: "Connecting...", variant: "outline" },
+  connected: { label: "Connected", variant: "default" },
+  disconnected: { label: "Disconnected", variant: "destructive" },
+  failed: { label: "Failed", variant: "destructive" },
 };
 
-export function RoomInfo({ roomId, connectionStatus }: RoomInfoProps) {
+export function RoomInfo({
+  roomId,
+  connectionStatus,
+  participantCount = 1,
+}: RoomInfoProps) {
   const [copied, setCopied] = useState(false);
 
   const copyRoomId = async () => {
@@ -29,7 +40,7 @@ export function RoomInfo({ roomId, connectionStatus }: RoomInfoProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy room ID:', error);
+      console.error("Failed to copy room ID:", error);
     }
   };
 
@@ -62,7 +73,14 @@ export function RoomInfo({ roomId, connectionStatus }: RoomInfoProps) {
             )}
           </Button>
         </div>
-        <Badge variant={status.variant}>{status.label}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="gap-1.5">
+            <Users className="w-3 h-3" />
+            {participantCount}{" "}
+            {participantCount === 1 ? "Participant" : "Participants"}
+          </Badge>
+          <Badge variant={status.variant}>{status.label}</Badge>
+        </div>
       </div>
     </Card>
   );

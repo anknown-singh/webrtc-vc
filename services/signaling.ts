@@ -1,31 +1,32 @@
-import { io, Socket } from 'socket.io-client';
-import type { SignalingMessage } from '@/types/webrtc';
+import { io, Socket } from "socket.io-client";
+import type { SignalingMessage } from "@/types/webrtc";
 
 class SignalingService {
   private socket: Socket | null = null;
   private serverUrl: string;
 
   constructor() {
-    this.serverUrl = process.env.NEXT_PUBLIC_SIGNALING_SERVER_URL || 'http://localhost:3001';
+    this.serverUrl =
+      process.env.NEXT_PUBLIC_SIGNALING_SERVER_URL || "http://localhost:3001";
   }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         this.socket = io(this.serverUrl, {
-          transports: ['websocket', 'polling'],
+          transports: ["websocket", "polling"],
           reconnection: true,
           reconnectionAttempts: 5,
           reconnectionDelay: 1000,
         });
 
-        this.socket.on('connect', () => {
-          console.log('Connected to signaling server');
+        this.socket.on("connect", () => {
+          console.log("Connected to signaling server");
           resolve();
         });
 
-        this.socket.on('connect_error', (error) => {
-          console.error('Connection error:', error);
+        this.socket.on("connect_error", (error) => {
+          console.error("Connection error:", error);
           reject(error);
         });
       } catch (error) {
@@ -60,27 +61,39 @@ class SignalingService {
   }
 
   createRoom(roomId: string): void {
-    this.emit('create-room', { roomId });
+    this.emit("create-room", { roomId });
   }
 
   joinRoom(roomId: string): void {
-    this.emit('join-room', { roomId });
+    this.emit("join-room", { roomId });
   }
 
   leaveRoom(roomId: string): void {
-    this.emit('leave-room', { roomId });
+    this.emit("leave-room", { roomId });
   }
 
-  sendOffer(roomId: string, offer: RTCSessionDescriptionInit): void {
-    this.emit('offer', { roomId, offer });
+  sendOffer(
+    roomId: string,
+    targetUserId: string,
+    offer: RTCSessionDescriptionInit
+  ): void {
+    this.emit("offer", { roomId, targetUserId, offer });
   }
 
-  sendAnswer(roomId: string, answer: RTCSessionDescriptionInit): void {
-    this.emit('answer', { roomId, answer });
+  sendAnswer(
+    roomId: string,
+    targetUserId: string,
+    answer: RTCSessionDescriptionInit
+  ): void {
+    this.emit("answer", { roomId, targetUserId, answer });
   }
 
-  sendIceCandidate(roomId: string, candidate: RTCIceCandidateInit): void {
-    this.emit('ice-candidate', { roomId, candidate });
+  sendIceCandidate(
+    roomId: string,
+    targetUserId: string,
+    candidate: RTCIceCandidateInit
+  ): void {
+    this.emit("ice-candidate", { roomId, targetUserId, candidate });
   }
 
   isConnected(): boolean {

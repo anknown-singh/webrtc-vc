@@ -1,17 +1,23 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { v4 as uuidv4 } from 'uuid';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Video, Users } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { v4 as uuidv4 } from "uuid";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Video, Users } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
-  const [roomId, setRoomId] = useState('');
-  const [error, setError] = useState('');
+  const [roomId, setRoomId] = useState("");
+  const [error, setError] = useState("");
 
   const handleCreateRoom = () => {
     const newRoomId = uuidv4();
@@ -20,10 +26,10 @@ export default function Home() {
 
   const handleJoinRoom = () => {
     if (!roomId.trim()) {
-      setError('Please enter a room ID');
+      setError("Please enter a room ID");
       return;
     }
-    setError('');
+    setError("");
     router.push(`/room/${roomId.trim()}`);
   };
 
@@ -56,11 +62,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button
-                onClick={handleCreateRoom}
-                className="w-full"
-                size="lg"
-              >
+              <Button onClick={handleCreateRoom} className="w-full" size="lg">
                 Create New Room
               </Button>
             </CardContent>
@@ -86,10 +88,10 @@ export default function Home() {
                   value={roomId}
                   onChange={(e) => {
                     setRoomId(e.target.value);
-                    setError('');
+                    setError("");
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       handleJoinRoom();
                     }
                   }}
@@ -121,7 +123,8 @@ export default function Home() {
                 1
               </span>
               <p>
-                <span className="text-white font-medium">Create a room:</span> Click &quot;Create New Room&quot; to start a new video call
+                <span className="text-white font-medium">Create a room:</span>{" "}
+                Click &quot;Create New Room&quot; to start a new video call
               </p>
             </div>
             <div className="flex gap-3">
@@ -129,7 +132,10 @@ export default function Home() {
                 2
               </span>
               <p>
-                <span className="text-white font-medium">Share the Room ID:</span> Copy the room ID and send it to the person you want to call
+                <span className="text-white font-medium">
+                  Share the Room ID:
+                </span>{" "}
+                Copy the room ID and send it to the person you want to call
               </p>
             </div>
             <div className="flex gap-3">
@@ -137,7 +143,9 @@ export default function Home() {
                 3
               </span>
               <p>
-                <span className="text-white font-medium">Join the call:</span> The other person enters the room ID and clicks &quot;Join Room&quot;
+                <span className="text-white font-medium">Join the call:</span>{" "}
+                The other person enters the room ID and clicks &quot;Join
+                Room&quot;
               </p>
             </div>
             <div className="flex gap-3">
@@ -145,7 +153,11 @@ export default function Home() {
                 4
               </span>
               <p>
-                <span className="text-white font-medium">Control your media:</span> Use the buttons to mute/unmute or turn video on/off during the call
+                <span className="text-white font-medium">
+                  Control your media:
+                </span>{" "}
+                Use the buttons to mute/unmute or turn video on/off during the
+                call
               </p>
             </div>
           </CardContent>
