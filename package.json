@@ -3,13 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "next dev",
-    "dev:server": "tsx watch server/index.ts",
+    "dev": "next dev",
     "build": "next build",
-    "start": "concurrently \"npm run start:client\" \"npm run start:server\"",
-    "start:client": "next start",
-    "start:server": "tsx server/index.ts",
+    "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
