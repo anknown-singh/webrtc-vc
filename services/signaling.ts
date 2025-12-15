@@ -61,7 +61,15 @@ class SignalingService {
   }
 
   createRoom(roomId: string): void {
-    this.emit("create-room", { roomId });
+    if (this.socket) {
+      this.socket.emit("create-room", { roomId }, (response: any) => {
+        if (response.error) {
+          console.error(response.error);
+          return;
+        }
+        console.log("Room created:", response.roomId);
+      });
+    }
   }
 
   joinRoom(roomId: string): void {
@@ -94,6 +102,163 @@ class SignalingService {
     candidate: RTCIceCandidateInit
   ): void {
     this.emit("ice-candidate", { roomId, targetUserId, candidate });
+  }
+
+  // SFU Methods
+
+  getRouterRtpCapabilities(roomId: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit(
+        "getRouterRtpCapabilities",
+        { roomId },
+        (response: any) => {
+          if (response.error) {
+            reject(new Error(response.error));
+          } else {
+            resolve(response);
+          }
+        }
+      );
+    });
+  }
+
+  createWebRtcTransport(roomId: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit("createWebRtcTransport", { roomId }, (response: any) => {
+        if (response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  connectTransport(
+    roomId: string,
+    transportId: string,
+    dtlsParameters: any
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit(
+        "connectTransport",
+        { roomId, transportId, dtlsParameters },
+        (response: any) => {
+          if (response.error) {
+            reject(new Error(response.error));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  produce(
+    roomId: string,
+    transportId: string,
+    kind: string,
+    rtpParameters: any
+  ): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit(
+        "produce",
+        { roomId, transportId, kind, rtpParameters },
+        (response: any) => {
+          if (response.error) {
+            reject(new Error(response.error));
+          } else {
+            resolve(response);
+          }
+        }
+      );
+    });
+  }
+
+  consume(
+    roomId: string,
+    transportId: string,
+    producerId: string,
+    rtpCapabilities: any
+  ): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit(
+        "consume",
+        { roomId, transportId, producerId, rtpCapabilities },
+        (response: any) => {
+          if (response.error) {
+            console.log({ error: response.error });
+            reject(new Error(response.error));
+          } else {
+            resolve(response);
+          }
+        }
+      );
+    });
+  }
+
+  resumeConsumer(roomId: string, consumerId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit(
+        "resumeConsumer",
+        { roomId, consumerId },
+        (response: any) => {
+          if (response.error) {
+            console.log({ error: response.error });
+            reject(new Error(response.error));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  getProducers(roomId: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit("getProducers", { roomId }, (response: any) => {
+        if (response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
   }
 
   isConnected(): boolean {

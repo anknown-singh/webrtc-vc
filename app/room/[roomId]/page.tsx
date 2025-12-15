@@ -142,7 +142,9 @@ export default function RoomPage({ params }: PageProps) {
         <div className={`flex-1 grid gap-4 ${getGridClass()}`}>
           {/* Local stream */}
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-zinc-400 px-1">You</h3>
+            <h3 className="text-sm font-medium text-zinc-400 px-1">
+              You {"u28368273".slice(0, 8)}
+            </h3>
             <VideoPlayer stream={localStream} isLocal={true} label="You" />
           </div>
 
@@ -160,7 +162,7 @@ export default function RoomPage({ params }: PageProps) {
           ))}
 
           {/* Placeholder when waiting for participants */}
-          {remoteStreams.size === 0 && (
+          {/* {remoteStreams.size === 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-zinc-400 px-1">
                 Waiting for participants...
@@ -172,7 +174,7 @@ export default function RoomPage({ params }: PageProps) {
                 </div>
               </Card>
             </div>
-          )}
+          )} */}
         </div>
 
         <div className="pb-4">

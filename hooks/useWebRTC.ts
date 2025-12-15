@@ -1,15 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Device, types } from "mediasoup-client";
 import { signalingService } from "@/services/signaling";
 import type { ConnectionStatus } from "@/types/webrtc";
 
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ],
-};
+type Transport = types.Transport;
+type Producer = types.Producer;
+type Consumer = types.Consumer;
 
 interface UseWebRTCProps {
   roomId: string;
@@ -28,304 +26,394 @@ export function useWebRTC({
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("idle");
 
-  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const iceCandidatesQueueRef = useRef<Map<string, RTCIceCandidateInit[]>>(
-    new Map()
-  );
+  const deviceRef = useRef<Device | null>(null);
+  const sendTransportRef = useRef<Transport | null>(null);
+  const recvTransportRef = useRef<Transport | null>(null);
+  const producersRef = useRef<Map<string, Producer>>(new Map());
+  const consumersRef = useRef<Map<string, Consumer>>(new Map());
+  const peerStreamsRef = useRef<Map<string, MediaStream>>(new Map());
 
-  const createPeerConnection = useCallback(
-    (peerId: string) => {
+  /**
+   * Initialize mediasoup Device
+   */
+  const initDevice = useCallback(async () => {
+    try {
+      console.log("Initializing mediasoup Device...");
+      const device = new Device();
+
+      const { rtpCapabilities } =
+        await signalingService.getRouterRtpCapabilities(roomId);
+      await device.load({ routerRtpCapabilities: rtpCapabilities });
+
+      deviceRef.current = device;
+      console.log("Device initialized with RTP capabilities");
+      return device;
+    } catch (error) {
+      console.error("Error initializing device:", error);
+      throw error;
+    }
+  }, [roomId]);
+
+  /**
+   * Create send transport
+   */
+  const createSendTransport = useCallback(
+    async (device: Device) => {
       try {
-        console.log(`Creating peer connection for peer: ${peerId}`);
-        const peerConnection = new RTCPeerConnection(ICE_SERVERS);
-
-        peerConnection.onicecandidate = (event) => {
-          if (event.candidate) {
-            console.log(`Sending ICE candidate to peer: ${peerId}`);
-            signalingService.sendIceCandidate(
-              roomId,
-              peerId,
-              event.candidate.toJSON()
-            );
-          }
-        };
-
-        peerConnection.ontrack = (event) => {
-          console.log(`Received remote track from peer: ${peerId}`);
-          const stream = event.streams[0];
-          setRemoteStreams((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(peerId, stream);
-            return newMap;
-          });
-        };
-
-        peerConnection.onconnectionstatechange = () => {
-          console.log(
-            `Connection state with ${peerId}:`,
-            peerConnection.connectionState
-          );
-
-          // Update overall connection status based on all peer connections
-          const connections = Array.from(peerConnectionsRef.current.values());
-          if (connections.some((pc) => pc.connectionState === "connected")) {
-            setConnectionStatus("connected");
-          } else if (
-            connections.every((pc) => pc.connectionState === "failed")
-          ) {
-            setConnectionStatus("failed");
-          } else if (
-            connections.some((pc) => pc.connectionState === "connecting")
-          ) {
-            setConnectionStatus("connecting");
-          }
-        };
-
-        peerConnection.oniceconnectionstatechange = () => {
-          console.log(
-            `ICE connection state with ${peerId}:`,
-            peerConnection.iceConnectionState
-          );
-        };
-
-        if (localStream) {
-          localStream.getTracks().forEach((track) => {
-            peerConnection.addTrack(track, localStream);
-          });
-        }
-
-        peerConnectionsRef.current.set(peerId, peerConnection);
-        return peerConnection;
-      } catch (error) {
-        console.error(`Error creating peer connection for ${peerId}:`, error);
-        throw error;
-      }
-    },
-    [roomId, localStream]
-  );
-
-  const createOffer = useCallback(
-    async (peerId: string) => {
-      try {
-        console.log(`Creating offer for peer: ${peerId}`);
-        let peerConnection = peerConnectionsRef.current.get(peerId);
-
-        if (!peerConnection) {
-          peerConnection = createPeerConnection(peerId);
-        }
-
-        const offer = await peerConnection.createOffer({
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: true,
-        });
-
-        await peerConnection.setLocalDescription(offer);
-        signalingService.sendOffer(roomId, peerId, offer);
-        console.log(`Offer sent to peer: ${peerId}`);
-      } catch (error) {
-        console.error(`Error creating offer for ${peerId}:`, error);
-        throw error;
-      }
-    },
-    [roomId, createPeerConnection]
-  );
-
-  const handleOffer = useCallback(
-    async (peerId: string, offer: RTCSessionDescriptionInit) => {
-      try {
-        console.log(`Handling offer from peer: ${peerId}`);
-        let peerConnection = peerConnectionsRef.current.get(peerId);
-
-        if (!peerConnection) {
-          peerConnection = createPeerConnection(peerId);
-        }
-
-        await peerConnection.setRemoteDescription(
-          new RTCSessionDescription(offer)
+        console.log("Creating send transport...");
+        const transportData = await signalingService.createWebRtcTransport(
+          roomId
         );
 
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        signalingService.sendAnswer(roomId, peerId, answer);
-
-        // Process queued ICE candidates for this peer
-        const queue = iceCandidatesQueueRef.current.get(peerId) || [];
-        queue.forEach((candidate) => {
-          peerConnection!.addIceCandidate(new RTCIceCandidate(candidate));
+        const transport = device.createSendTransport({
+          id: transportData.id,
+          iceParameters: transportData.iceParameters,
+          iceCandidates: transportData.iceCandidates,
+          dtlsParameters: transportData.dtlsParameters,
         });
-        iceCandidatesQueueRef.current.delete(peerId);
 
-        console.log(`Answer sent to peer: ${peerId}`);
+        // Handle transport connection
+        transport.on(
+          "connect",
+          async ({ dtlsParameters }, callback, errback) => {
+            try {
+              console.log("Connecting send transport...");
+              await signalingService.connectTransport(
+                roomId,
+                transport.id,
+                dtlsParameters
+              );
+              callback();
+            } catch (error) {
+              console.error("Error connecting send transport:", error);
+              errback(error as Error);
+            }
+          }
+        );
+
+        // Handle produce
+        transport.on(
+          "produce",
+          async ({ kind, rtpParameters }, callback, errback) => {
+            try {
+              console.log(`Producing ${kind}...`);
+              const { id } = await signalingService.produce(
+                roomId,
+                transport.id,
+                kind,
+                rtpParameters
+              );
+              callback({ id });
+            } catch (error) {
+              console.error("Error producing:", error);
+              errback(error as Error);
+            }
+          }
+        );
+
+        transport.on("connectionstatechange", (state) => {
+          console.log("Send transport connection state:", state);
+          if (state === "connected") {
+            setConnectionStatus("connected");
+          } else if (state === "failed") {
+            setConnectionStatus("failed");
+          } else if (state === "disconnected") {
+            setConnectionStatus("disconnected");
+          }
+        });
+
+        sendTransportRef.current = transport;
+        console.log("Send transport created:", transport.id);
+        return transport;
       } catch (error) {
-        console.error(`Error handling offer from ${peerId}:`, error);
+        console.error("Error creating send transport:", error);
         throw error;
       }
     },
-    [roomId, createPeerConnection]
+    [roomId]
   );
 
-  const handleAnswer = useCallback(
-    async (peerId: string, answer: RTCSessionDescriptionInit) => {
+  /**
+   * Create receive transport
+   */
+  const createRecvTransport = useCallback(
+    async (device: Device) => {
       try {
-        console.log(`Handling answer from peer: ${peerId}`);
-        const peerConnection = peerConnectionsRef.current.get(peerId);
+        console.log("Creating receive transport...");
+        const transportData = await signalingService.createWebRtcTransport(
+          roomId
+        );
 
-        if (!peerConnection) {
-          console.error(`No peer connection found for ${peerId}`);
+        const transport = device.createRecvTransport({
+          id: transportData.id,
+          iceParameters: transportData.iceParameters,
+          iceCandidates: transportData.iceCandidates,
+          dtlsParameters: transportData.dtlsParameters,
+        });
+
+        // Handle transport connection
+        transport.on(
+          "connect",
+          async ({ dtlsParameters }, callback, errback) => {
+            try {
+              console.log("Connecting receive transport...");
+              await signalingService.connectTransport(
+                roomId,
+                transport.id,
+                dtlsParameters
+              );
+              callback();
+            } catch (error) {
+              console.error("Error connecting receive transport:", error);
+              errback(error as Error);
+            }
+          }
+        );
+
+        transport.on("connectionstatechange", (state) => {
+          console.log("Receive transport connection state:", state);
+        });
+
+        recvTransportRef.current = transport;
+        console.log("Receive transport created:", transport.id);
+        return transport;
+      } catch (error) {
+        console.error("Error creating receive transport:", error);
+        throw error;
+      }
+    },
+    [roomId]
+  );
+
+  /**
+   * Produce media (send local tracks)
+   */
+  const produceMedia = useCallback(
+    async (transport: Transport, stream: MediaStream) => {
+      try {
+        const tracks = stream.getTracks();
+        console.log(`Producing ${tracks.length} tracks...`);
+
+        for (const track of tracks) {
+          const producer = await transport.produce({ track });
+          producersRef.current.set(producer.id, producer);
+          console.log(`Producer created: ${producer.id} (${track.kind})`);
+
+          producer.on("trackended", () => {
+            console.log("Track ended:", producer.id);
+          });
+
+          producer.on("transportclose", () => {
+            console.log("Producer transport closed:", producer.id);
+            producersRef.current.delete(producer.id);
+          });
+        }
+      } catch (error) {
+        console.error("Error producing media:", error);
+        throw error;
+      }
+    },
+    []
+  );
+
+  /**
+   * Consume media from a producer
+   */
+  const consumeMedia = useCallback(
+    async (producerId: string, peerId: string, kind: string) => {
+      try {
+        const device = deviceRef.current;
+        const transport = recvTransportRef.current;
+
+        if (!device || !transport) {
+          console.error("Device or receive transport not ready");
           return;
         }
 
-        await peerConnection.setRemoteDescription(
-          new RTCSessionDescription(answer)
+        console.log(
+          `Consuming ${kind} from peer ${peerId}, producer: ${producerId}`
         );
 
-        // Process queued ICE candidates for this peer
-        const queue = iceCandidatesQueueRef.current.get(peerId) || [];
-        queue.forEach((candidate) => {
-          peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        const consumerData = await signalingService.consume(
+          roomId,
+          transport.id,
+          producerId,
+          device.rtpCapabilities
+        );
+
+        console.log("Consumer data received:", {
+          consumerId: consumerData.id,
+          producerId: consumerData.producerId,
+          kind: consumerData.kind,
         });
-        iceCandidatesQueueRef.current.delete(peerId);
 
-        console.log(`Answer received from peer: ${peerId}`);
+        const consumer = await transport.consume({
+          id: consumerData.id,
+          producerId: consumerData.producerId,
+          kind: consumerData.kind,
+          rtpParameters: consumerData.rtpParameters,
+        });
+
+        consumersRef.current.set(consumer.id, consumer);
+
+        // Resume consumer
+        await signalingService.resumeConsumer(roomId, consumer.id);
+        console.log(`Consumer resumed: ${consumer.id}`);
+
+        // Add track to peer's stream
+        const stream = peerStreamsRef.current.get(peerId) || new MediaStream();
+        const tracksBefore = stream.getTracks().length;
+        stream.addTrack(consumer.track);
+        const tracksAfter = stream.getTracks().length;
+
+        console.log(`Track added to peer ${peerId}: ${kind} track`, {
+          trackId: consumer.track.id,
+          trackKind: consumer.track.kind,
+          trackEnabled: consumer.track.enabled,
+          trackReadyState: consumer.track.readyState,
+          tracksBefore,
+          tracksAfter,
+          totalTracks: stream.getTracks().map((t) => t.kind),
+        });
+
+        peerStreamsRef.current.set(peerId, stream);
+        setRemoteStreams(new Map(peerStreamsRef.current));
+
+        consumer.on("trackended", () => {
+          console.log("Consumer track ended:", consumer.id);
+        });
+
+        consumer.on("transportclose", () => {
+          console.log("Consumer transport closed:", consumer.id);
+          consumersRef.current.delete(consumer.id);
+        });
       } catch (error) {
-        console.error(`Error handling answer from ${peerId}:`, error);
-        throw error;
+        console.error("Error consuming media:", error);
       }
     },
-    []
+    [roomId]
   );
 
-  const handleIceCandidate = useCallback(
-    async (peerId: string, candidate: RTCIceCandidateInit) => {
-      try {
-        const peerConnection = peerConnectionsRef.current.get(peerId);
-
-        if (peerConnection?.remoteDescription) {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-          console.log(`ICE candidate added for peer: ${peerId}`);
-        } else {
-          // Queue candidate until remote description is set
-          const queue = iceCandidatesQueueRef.current.get(peerId) || [];
-          queue.push(candidate);
-          iceCandidatesQueueRef.current.set(peerId, queue);
-          console.log(`ICE candidate queued for peer: ${peerId}`);
-        }
-      } catch (error) {
-        console.error(`Error handling ICE candidate from ${peerId}:`, error);
-      }
+  /**
+   * Handle new producer notification
+   */
+  const handleNewProducer = useCallback(
+    async (data: { producerId: string; peerId: string; kind: string }) => {
+      console.log("New producer notification received:", {
+        producerId: data.producerId,
+        peerId: data.peerId,
+        kind: data.kind,
+        currentPeers: Array.from(peerStreamsRef.current.keys()),
+        currentConsumers: consumersRef.current.size,
+      });
+      await consumeMedia(data.producerId, data.peerId, data.kind);
     },
-    []
+    [consumeMedia]
   );
 
-  const handleParticipantsList = useCallback(
-    async (participants: string[]) => {
-      console.log("Received participants list:", participants);
-      // Create offers to all existing participants
-      for (const peerId of participants) {
-        await createOffer(peerId);
-      }
-    },
-    [createOffer]
-  );
+  /**
+   * Handle user left
+   */
+  const handleUserLeft = useCallback((data: { userId: string }) => {
+    console.log("User left:", data.userId);
 
-  const handleUserJoined = useCallback(
-    async (userId: string) => {
-      console.log("User joined:", userId);
-      // Only initiator creates offers to newly joined users
-      if (isInitiator || peerConnectionsRef.current.size > 0) {
-        await createOffer(userId);
-      }
-    },
-    [isInitiator, createOffer]
-  );
+    // Remove peer's stream
+    peerStreamsRef.current.delete(data.userId);
+    setRemoteStreams(new Map(peerStreamsRef.current));
 
-  const handleUserLeft = useCallback((userId: string) => {
-    console.log("User left:", userId);
-
-    // Close and remove peer connection
-    const peerConnection = peerConnectionsRef.current.get(userId);
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnectionsRef.current.delete(userId);
-    }
-
-    // Remove remote stream
-    setRemoteStreams((prev) => {
-      const newMap = new Map(prev);
-      newMap.delete(userId);
-      return newMap;
+    // Close consumers for this peer
+    consumersRef.current.forEach((consumer, consumerId) => {
+      // Note: We don't have direct peer-consumer mapping,
+      // so we rely on server cleanup and transportclose events
     });
 
-    // Remove ICE candidates queue
-    iceCandidatesQueueRef.current.delete(userId);
-
     // Update connection status
-    if (peerConnectionsRef.current.size === 0) {
+    if (peerStreamsRef.current.size === 0) {
       setConnectionStatus("disconnected");
     }
   }, []);
 
+  /**
+   * Initialize connection
+   */
   const initializeConnection = useCallback(async () => {
     try {
       setConnectionStatus("connecting");
+      console.log("Initializing SFU connection...");
+
+      // Connect to signaling server
       await signalingService.connect();
 
+      // Join or create room
       if (isInitiator) {
         signalingService.createRoom(roomId);
       } else {
         signalingService.joinRoom(roomId);
       }
 
-      // Listen for room-joined event (for joiners) - receives existing participants
+      // Initialize device
+      const device = await initDevice();
+
+      // Create transports
+      const sendTransport = await createSendTransport(device);
+      await createRecvTransport(device);
+
+      // Produce local media
+      if (localStream) {
+        await produceMedia(sendTransport, localStream);
+      }
+
+      // Listen for new producers
+      signalingService.on("newProducer", handleNewProducer);
+
+      // Listen for user left
+      signalingService.on("user-left", handleUserLeft);
+
+      signalingService.on(
+        "test-joined",
+        async (data: { roomId: string; participants: string[] }) => {
+          console.log("Room joined event received:", {
+            roomId: data.roomId,
+            participants: data.participants,
+          });
+        }
+      );
+
+      // Get existing producers
       signalingService.on(
         "room-joined",
-        (data: { roomId: string; participants: string[] }) => {
-          console.log("Room joined, existing participants:", data.participants);
-          handleParticipantsList(data.participants);
+        async (data: { roomId: string; participants: string[] }) => {
+          console.log("Room joined event received:", {
+            roomId: data.roomId,
+            participants: data.participants,
+          });
+
+          const { producers } = await signalingService.getProducers(roomId);
+          console.log(
+            `Found ${producers.length} existing producers:`,
+            producers
+          );
+
+          for (const producer of producers) {
+            console.log(`Processing existing producer:`, {
+              producerId: producer.producerId,
+              peerId: producer.peerId,
+              kind: producer.kind,
+            });
+            await consumeMedia(
+              producer.producerId,
+              producer.peerId,
+              producer.kind
+            );
+          }
         }
       );
 
-      // Listen for user-joined event - a new user joined the room
-      signalingService.on("user-joined", (data: { userId: string }) => {
-        handleUserJoined(data.userId);
+      signalingService.on("room-created", () => {
+        console.log("Room created, waiting for participants...");
       });
 
-      // Listen for offer from a specific peer
-      signalingService.on(
-        "offer",
-        (data: { offer: RTCSessionDescriptionInit; userId: string }) => {
-          console.log("Received offer from:", data.userId);
-          handleOffer(data.userId, data.offer);
-        }
-      );
-
-      // Listen for answer from a specific peer
-      signalingService.on(
-        "answer",
-        (data: { answer: RTCSessionDescriptionInit; userId: string }) => {
-          console.log("Received answer from:", data.userId);
-          handleAnswer(data.userId, data.answer);
-        }
-      );
-
-      // Listen for ICE candidate from a specific peer
-      signalingService.on(
-        "ice-candidate",
-        (data: { candidate: RTCIceCandidateInit; userId: string }) => {
-          console.log("Received ICE candidate from:", data.userId);
-          handleIceCandidate(data.userId, data.candidate);
-        }
-      );
-
-      // Listen for user-left event
-      signalingService.on("user-left", (data: { userId: string }) => {
-        handleUserLeft(data.userId);
-      });
-
-      signalingService.on("room-full", () => {
-        console.error("Room is full");
-        setConnectionStatus("failed");
-      });
+      console.log("SFU connection initialized successfully");
     } catch (error) {
       console.error("Error initializing connection:", error);
       setConnectionStatus("failed");
@@ -333,29 +421,83 @@ export function useWebRTC({
     }
   }, [
     roomId,
+    localStream,
     isInitiator,
-    handleParticipantsList,
-    handleUserJoined,
-    handleOffer,
-    handleAnswer,
-    handleIceCandidate,
+    initDevice,
+    createSendTransport,
+    createRecvTransport,
+    produceMedia,
+    consumeMedia,
+    handleNewProducer,
     handleUserLeft,
   ]);
 
+  /**
+   * Close connection
+   */
   const closeConnection = useCallback(() => {
-    // Close all peer connections
-    peerConnectionsRef.current.forEach((peerConnection, peerId) => {
-      console.log(`Closing connection with peer: ${peerId}`);
-      peerConnection.close();
-    });
-    peerConnectionsRef.current.clear();
-    iceCandidatesQueueRef.current.clear();
+    console.log("Closing SFU connection...");
 
+    // Close all producers
+    producersRef.current.forEach((producer) => {
+      try {
+        if (!producer.closed) {
+          producer.close();
+        }
+      } catch (error) {
+        console.warn("Error closing producer:", error);
+      }
+    });
+    producersRef.current.clear();
+
+    // Close all consumers
+    consumersRef.current.forEach((consumer) => {
+      try {
+        if (!consumer.closed) {
+          consumer.close();
+        }
+      } catch (error) {
+        console.warn("Error closing consumer:", error);
+      }
+    });
+    consumersRef.current.clear();
+
+    // Close transports
+    if (sendTransportRef.current) {
+      try {
+        if (!sendTransportRef.current.closed) {
+          sendTransportRef.current.close();
+        }
+      } catch (error) {
+        console.warn("Error closing send transport:", error);
+      }
+      sendTransportRef.current = null;
+    }
+
+    if (recvTransportRef.current) {
+      try {
+        if (!recvTransportRef.current.closed) {
+          recvTransportRef.current.close();
+        }
+      } catch (error) {
+        console.warn("Error closing receive transport:", error);
+      }
+      recvTransportRef.current = null;
+    }
+
+    // Clear device
+    deviceRef.current = null;
+
+    // Leave room and disconnect
     signalingService.leaveRoom(roomId);
     signalingService.disconnect();
 
+    // Clear state
+    peerStreamsRef.current.clear();
     setRemoteStreams(new Map());
     setConnectionStatus("disconnected");
+
+    console.log("SFU connection closed");
   }, [roomId]);
 
   useEffect(() => {
