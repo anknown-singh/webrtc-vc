@@ -5,45 +5,17 @@ This is a quick guide to get your WebRTC video calling app deployed to Vercel in
 ## Prerequisites
 
 - A GitHub account
-- A Vercel account (sign up at https://vercel.com)
-- A Railway account for the signaling server (sign up at https://railway.app)
+- A Vercel account (sign up at <https://vercel.com>)
+- A Railway account for the signaling server (sign up at <https://railway.app>)
 
 ## Step-by-Step Deployment
 
-### Part 1: Deploy Signaling Server (5 minutes)
-
-1. **Install Railway CLI**
-   ```bash
-   npm i -g @railway/cli
-   ```
-
-2. **Deploy the server**
-   ```bash
-   cd server
-   railway login
-   railway init
-   railway up
-   ```
-
-3. **Set environment variables**
-   ```bash
-   railway variables set PORT=3001
-   railway variables set CLIENT_URL=https://your-vercel-app.vercel.app
-   ```
-   (You'll update the CLIENT_URL in step 2 after deploying to Vercel)
-
-4. **Get your server URL**
-   ```bash
-   railway domain
-   ```
-   **Copy this URL** - you'll need it for Vercel deployment.
-   Example: `https://webrtc-signaling-production.up.railway.app`
-
-### Part 2: Deploy Frontend to Vercel (5 minutes)
+### Deploy Frontend to Vercel (5 minutes)
 
 #### Option A: Deploy via GitHub (Recommended)
 
 1. **Push your code to GitHub**
+
    ```bash
    cd ..  # Go back to project root
    git add .
@@ -52,7 +24,7 @@ This is a quick guide to get your WebRTC video calling app deployed to Vercel in
    ```
 
 2. **Go to Vercel Dashboard**
-   - Visit https://vercel.com/new
+   - Visit <https://vercel.com/new>
    - Click "Import Project"
    - Select your GitHub repository
 
@@ -75,22 +47,27 @@ This is a quick guide to get your WebRTC video calling app deployed to Vercel in
 #### Option B: Deploy via Vercel CLI
 
 1. **Install Vercel CLI**
+
    ```bash
    npm i -g vercel
    ```
 
 2. **Deploy**
+
    ```bash
    vercel
    ```
 
 3. **Set environment variable**
+
    ```bash
    vercel env add NEXT_PUBLIC_SIGNALING_SERVER_URL
    ```
+
    Paste your Railway server URL when prompted.
 
 4. **Deploy to production**
+
    ```bash
    vercel --prod
    ```
@@ -114,6 +91,7 @@ Replace `https://your-app.vercel.app` with your actual Vercel URL.
    Visit: `https://your-railway-server.railway.app/health`
 
    You should see:
+
    ```json
    {
      "status": "ok",
@@ -135,12 +113,14 @@ Replace `https://your-app.vercel.app` with your actual Vercel URL.
 ### ❌ "Failed to connect to signaling server"
 
 **Check:**
+
 1. Is your Railway server running? Visit the `/health` endpoint
 2. Is `NEXT_PUBLIC_SIGNALING_SERVER_URL` set correctly in Vercel?
    - Go to Vercel Dashboard → Your Project → Settings → Environment Variables
 3. Did you include `https://` in the server URL?
 
 **Fix:**
+
 ```bash
 # Update Vercel environment variable
 vercel env rm NEXT_PUBLIC_SIGNALING_SERVER_URL
@@ -152,6 +132,7 @@ vercel --prod
 ### ❌ "CORS error" in browser console
 
 **Fix:**
+
 ```bash
 # Update Railway CLIENT_URL
 cd server
@@ -161,6 +142,7 @@ railway variables set CLIENT_URL=https://your-actual-vercel-url.vercel.app
 ### ❌ Camera/Microphone not working
 
 **Check:**
+
 - Both sites must use HTTPS (Vercel and Railway do this automatically)
 - Browser permissions are allowed
 - Not already in use by another application
@@ -168,17 +150,22 @@ railway variables set CLIENT_URL=https://your-actual-vercel-url.vercel.app
 ## Update Your App Later
 
 ### Update Frontend (Vercel)
+
 1. Push changes to GitHub:
+
    ```bash
    git add .
    git commit -m "Update frontend"
    git push origin main
    ```
+
 2. Vercel automatically redeploys!
 
 ### Update Server (Railway)
+
 1. Make changes to server code
 2. Deploy:
+
    ```bash
    cd server
    railway up
@@ -187,11 +174,13 @@ railway variables set CLIENT_URL=https://your-actual-vercel-url.vercel.app
 ## Environment Variables Summary
 
 ### Vercel (Frontend)
+
 | Variable | Value | Example |
 |----------|-------|---------|
 | `NEXT_PUBLIC_SIGNALING_SERVER_URL` | Your Railway server URL | `https://webrtc-signaling-production.up.railway.app` |
 
 ### Railway (Server)
+
 | Variable | Value | Example |
 |----------|-------|---------|
 | `PORT` | 3001 | `3001` |
@@ -207,7 +196,7 @@ railway variables set CLIENT_URL=https://your-actual-vercel-url.vercel.app
 
 If you prefer a free option for the server:
 
-1. Go to https://render.com
+1. Go to <https://render.com>
 2. Create a new "Web Service"
 3. Connect your GitHub repo
 4. Root Directory: `server`
@@ -218,6 +207,7 @@ If you prefer a free option for the server:
    - `CLIENT_URL`: Your Vercel URL
 
 Render's free tier:
+
 - Spins down after 15 minutes of inactivity
 - First request may be slow (cold start)
 - Good for testing, not ideal for production
